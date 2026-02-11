@@ -1,50 +1,51 @@
 import cv2
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 
 
+print("OpenCV Version:", cv2.__version__)
 
-def load_images(image_paths):
-    images = []
-    
-    for path in image_paths:
-        img = cv2.imread(path)
-        
-        if img is None:
-            print(f"Error loading image: {path}")
-        else:
-            print(f"Loaded image: {path}")
-            images.append(img)
-    
-    return images
+try:
+    sift = cv2.SIFT_create()
+    print("SIFT is working correctly ")
+except:
+    print("SIFT is NOT working ")
 
 
 
 
-def display_images(images, titles=None):
-    plt.figure(figsize=(15, 5))
-    
-    for i, img in enumerate(images):
-    
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        
-        plt.subplot(1, len(images), i+1)
-        plt.imshow(img_rgb)
-        
-        if titles:
-            plt.title(titles[i])
-        
-        plt.axis("off")
-    
-    plt.tight_layout()
-    plt.show()
+
+img1 = cv2.imread("image1.jpeg")
+img2 = cv2.imread("image2.jpeg")
+img3 = cv2.imread("image3.jpeg")
 
 
+if img1 is None or img2 is None or img3 is None:
+    print("Error loading images. Check file paths.")
+    exit()
 
-if __name__ == "__main__":
-    
-    image_paths = ["image1.jpeg", "image2.jpeg", "image3.jpeg"]
-    
-    images = load_images(image_paths)
-    
-    display_images(images, titles=["Image 1", "Image 2", "Image 3"])
+# Converting BGR to RGB 
+img1_rgb = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
+img2_rgb = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
+img3_rgb = cv2.cvtColor(img3, cv2.COLOR_BGR2RGB)
+
+# Display images
+plt.figure(figsize=(15,5))
+
+plt.subplot(1,3,1)
+plt.imshow(img1_rgb)
+plt.title("Image 1")
+plt.axis("off")
+
+plt.subplot(1,3,2)
+plt.imshow(img2_rgb)
+plt.title("Image 2")
+plt.axis("off")
+
+plt.subplot(1,3,3)
+plt.imshow(img3_rgb)
+plt.title("Image 3")
+plt.axis("off")
+
+plt.show()
