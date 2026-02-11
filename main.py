@@ -193,7 +193,14 @@ for y in range(canvas_height):
 
         # Check bounds
         if 0 <= x1 < w1 and 0 <= y1 < h1:
-            canvas[y, x] = img1[y1, x1]
+            # If pixel already has img2 (overlap)
+            if np.any(canvas[y, x] != 0):
+                # simple 50-50 blending
+                blended = 0.5 * img1[y1, x1] + 0.5 * canvas[y, x]
+                canvas[y, x] = blended.astype(np.uint8)
+            else:
+                canvas[y, x] = img1[y1, x1]
+
 
 # Show result
 plt.figure(figsize=(12,6))
@@ -204,9 +211,4 @@ plt.show(block=False)
 plt.pause(3)
 
 # Save output
-cv2.imwrite("naive_panorama.jpg", canvas)
-
-
-
-
-
+cv2.imwrite("blended_panorama.jpg", canvas)
