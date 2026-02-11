@@ -153,4 +153,60 @@ plt.axis("off")
 
 plt.show(block=False)
 
+src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches12]).reshape(-1,1,2)
+dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches12]).reshape(-1,1,2)
+
+# Compute homography using RANSAC
+H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+
+print("Homography Matrix H:")
+print(H)
+
+h1, w1 = img1.shape[:2]
+h2, w2 = img2.shape[:2]
+
+# Create canvas
+canvas_height = max(h1, h2)
+canvas_width = w1 + w2
+
+canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
+
+# Place center image (img2)
+canvas[0:h2, w1:w1+w2] = img2
+
+# Inverse homography
+H_inv = np.linalg.inv(H)
+
+# Warp img1 onto canvas
+for y in range(canvas_height):
+    for x in range(canvas_width):
+
+        # Adjust x coordinate (because img2 is shifted)
+        p_canvas = np.array([x - w1, y, 1])
+
+        # Map back to img1
+        p_img1 = H_inv @ p_canvas
+        p_img1 = p_img1 / p_img1[2]
+
+        x1 = int(p_img1[0])
+        y1 = int(p_img1[1])
+
+        # Check bounds
+        if 0 <= x1 < w1 and 0 <= y1 < h1:
+            canvas[y, x] = img1[y1, x1]
+
+# Show result
+plt.figure(figsize=(12,6))
+plt.imshow(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
+plt.title("Naive Stitch")
+plt.axis("off")
+plt.show(block=False)
+plt.pause(3)
+
+# Save output
+cv2.imwrite("naive_panorama.jpg", canvas)
+
+
+
+
 
