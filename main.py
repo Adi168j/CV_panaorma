@@ -12,9 +12,7 @@ try:
 except:
     print("SIFT is NOT working ")
 
-
-
-
+      
 
 img1 = cv2.imread("image1.jpeg")
 img2 = cv2.imread("image2.jpeg")
@@ -25,32 +23,7 @@ if img1 is None or img2 is None or img3 is None:
     print("Error loading images. Check file paths.")
     exit()
 
-# # Converting BGR to RGB 
-# img1_rgb = cv2.cvtColor(img1, cv2.COLOR_BGR2RGB)
-# img2_rgb = cv2.cvtColor(img2, cv2.COLOR_BGR2RGB)
-# img3_rgb = cv2.cvtColor(img3, cv2.COLOR_BGR2RGB)
-
-# # Display images
-# plt.figure(figsize=(15,5))
-
-# plt.subplot(1,3,1)
-# plt.imshow(img1_rgb)
-# plt.title("Image 1")
-# plt.axis("off")
-
-# plt.subplot(1,3,2)
-# plt.imshow(img2_rgb)
-# plt.title("Image 2")
-# plt.axis("off")
-
-# plt.subplot(1,3,3)
-# plt.imshow(img3_rgb)
-# plt.title("Image 3")
-# plt.axis("off")
-
-# plt.show()
-
-
+   
 
 gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
@@ -100,7 +73,7 @@ plt.title("SIFT Keypoints - Image 3")
 plt.axis("off")
 
 plt.show(block=False)
-plt.pause(3)
+
 
 
 bf = cv2.BFMatcher()
@@ -108,11 +81,9 @@ bf = cv2.BFMatcher()
 # Match descriptors (Image 1 and Image 2)
 matches12 = bf.knnMatch(des1, des2, k=2)
 
-# Match descriptors (Image 2 and Image 3)
+
 matches23 = bf.knnMatch(des2, des3, k=2)
 
-
-# Apply Lowe's Ratio Test
 good_matches12 = []
 for m, n in matches12:
     if m.distance < 0.75 * n.distance:
@@ -152,63 +123,110 @@ plt.title("Feature Matches: Image 2 ↔ Image 3")
 plt.axis("off")
 
 plt.show(block=False)
+plt.pause(3)  
+
 
 src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches12]).reshape(-1,1,2)
 dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches12]).reshape(-1,1,2)
 
-# Compute homography using RANSAC
-H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+H12, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
 
-print("Homography Matrix H:")
-print(H)
+print("Homography Matrix H12:")
+print(H12)
+
+src_pts_23 = np.float32([kp3[m.trainIdx].pt for m in good_matches23]).reshape(-1,1,2)
+dst_pts_23 = np.float32([kp2[m.queryIdx].pt for m in good_matches23]).reshape(-1,1,2)
+
+H23, mask23 = cv2.findHomography(src_pts_23, dst_pts_23, cv2.RANSAC, 5.0)
+
+print("Homography Matrix H23:")
+print(H23)
+
+
 
 h1, w1 = img1.shape[:2]
 h2, w2 = img2.shape[:2]
+h3, w3 = img3.shape[:2]
 
-# Create canvas
-canvas_height = max(h1, h2)
-canvas_width = w1 + w2
+# Create large canvas
+canvas_height = max(h1, h2, h3) * 2
+canvas_width = (w1 + w2 + w3)
 
 canvas = np.zeros((canvas_height, canvas_width, 3), dtype=np.uint8)
 
 # Place center image (img2)
-canvas[0:h2, w1:w1+w2] = img2
+center_x = w1
+center_y = canvas_height // 4
 
-# Inverse homography
-H_inv = np.linalg.inv(H)
+canvas[center_y:center_y+h2, center_x:center_x+w2] = img2
+
 
 # Warp img1 onto canvas
-for y in range(canvas_height):
-    for x in range(canvas_width):
+warp_img1 = cv2.warpPerspective(img1, 
+                                np.array([[1,0,center_x],[0,1,center_y],[0,0,1]]) @ H12,
+                                (canvas_width, canvas_height))
 
-        # Adjust x coordinate (because img2 is shifted)
-        p_canvas = np.array([x - w1, y, 1])
+# Warp img3 onto canvas
+warp_img3 = cv2.warpPerspective(img3, 
+                                np.array([[1,0,center_x],[0,1,center_y],[0,0,1]]) @ H23,
+                                (canvas_width, canvas_height))
 
-        # Map back to img1
-        p_img1 = H_inv @ p_canvas
-        p_img1 = p_img1 / p_img1[2]
+naive_panorama = canvas.copy()
 
-        x1 = int(p_img1[0])
-        y1 = int(p_img1[1])
+mask1 = warp_img1 > 0
+naive_panorama[mask1] = warp_img1[mask1]
 
-        # Check bounds
-        if 0 <= x1 < w1 and 0 <= y1 < h1:
-            # If pixel already has img2 (overlap)
-            if np.any(canvas[y, x] != 0):
-                # simple 50-50 blending
-                blended = 0.5 * img1[y1, x1] + 0.5 * canvas[y, x]
-                canvas[y, x] = blended.astype(np.uint8)
-            else:
-                canvas[y, x] = img1[y1, x1]
+mask3 = warp_img3 > 0
+naive_panorama[mask3] = warp_img3[mask3]
 
 
-# Show result
 plt.figure(figsize=(12,6))
-plt.imshow(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
+plt.imshow(cv2.cvtColor(naive_panorama, cv2.COLOR_BGR2RGB))
 plt.title("Naive Stitch")
 plt.axis("off")
 plt.show(block=False)
-plt.pause(3)
+plt.pause(3) 
 
-# Save output
-cv2.imwrite("blended_panorama.jpg", canvas)
+cv2.imwrite("naive_panorama.jpg", naive_panorama)
+
+
+blended_panorama = canvas.copy()
+
+alpha = 0.5
+
+for y in range(canvas_height):
+    for x in range(canvas_width):
+
+        if np.any(warp_img1[y,x] != 0) and np.any(blended_panorama[y,x] != 0):
+            blended_panorama[y,x] = alpha*warp_img1[y,x] + (1-alpha)*blended_panorama[y,x]
+
+        elif np.any(warp_img1[y,x] != 0):
+            blended_panorama[y,x] = warp_img1[y,x]
+
+        if np.any(warp_img3[y,x] != 0) and np.any(blended_panorama[y,x] != 0):
+            blended_panorama[y,x] = alpha*warp_img3[y,x] + (1-alpha)*blended_panorama[y,x]
+
+        elif np.any(warp_img3[y,x] != 0):
+            blended_panorama[y,x] = warp_img3[y,x]
+
+
+
+
+gray = cv2.cvtColor(blended_panorama, cv2.COLOR_BGR2GRAY)
+coords = np.column_stack(np.where(gray > 0))
+
+y_min, x_min = coords.min(axis=0)
+y_max, x_max = coords.max(axis=0)
+
+final_panorama = blended_panorama[y_min:y_max, x_min:x_max]
+
+
+plt.figure(figsize=(12,6))
+plt.imshow(cv2.cvtColor(final_panorama, cv2.COLOR_BGR2RGB))
+plt.title("Final Cropped Panorama")
+plt.axis("off")
+plt.show(block=False)
+plt.pause(3) 
+
+
+cv2.imwrite("final_panorama.jpg", final_panorama)
